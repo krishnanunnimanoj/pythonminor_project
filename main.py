@@ -23,3 +23,11 @@ payloads = generate_range(min_payload,max_payload)
 
 print('Payload values: ')
 print(payloads)
+
+min_speed = float(input('Enter minimum speed: '))
+max_speed = float(input('Enter maximum speed: '))
+
+speeds = generate_range(min_speed, max_speed)
+
+print('Speed values: ')
+print(speeds)
