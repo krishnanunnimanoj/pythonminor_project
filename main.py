@@ -31,3 +31,20 @@ speeds = generate_range(min_speed, max_speed)
 
 print('Speed values: ')
 print(speeds)
+
+scenarios = []
+
+for payload in payloads:
+
+    for speed in speeds:
+
+        scenario = {
+            "payload":payload,
+            "speed":speed
+        }
+
+        scenarios.append(scenario)
+print("Scenarios:")
+
+for scenario in scenarios:
+    print(scenario)
