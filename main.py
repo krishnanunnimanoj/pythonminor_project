@@ -1,13 +1,16 @@
-def generate_range(min_value,max_value):
-    number_of_points = 5
-
-    step = (max_value - min_value) / (number_of_points - 1)
+import matplotlib.pyplot as plt
+def generate_range(min_value, max_value, step):
 
     values = []
 
-    for i in range(number_of_points):
-        value  = min_value + i * step
-        values.append(value)
+    current_value = min_value
+
+    while current_value <= max_value:
+
+        values.append(round(current_value, 2))
+
+        current_value += step
+
     return values
 
 
@@ -17,7 +20,7 @@ robot_mass = float(input("Enter robot mass: "))
 min_payload = float(input('Enter minimum payload: '))
 max_payload = float(input('Enter maximum payload: '))
 
-payloads = generate_range(min_payload,max_payload)
+payloads = generate_range(min_payload,max_payload,0.5)
 
 
 
@@ -27,21 +30,90 @@ print(payloads)
 min_speed = float(input('Enter minimum speed: '))
 max_speed = float(input('Enter maximum speed: '))
 
-speeds = generate_range(min_speed, max_speed)
+speeds = generate_range(min_speed, max_speed,1)
 
 print('Speed values: ')
 print(speeds)
+#Robot Parameters#
 wheel_radius = 0.1
 motor_max_torque = 1.0
 acceleration = 1.0
 
-number_of_motors = 2
+number_of_motors = 4
 motor_torque_constant = 0.1
 motor_max_current = 8.0
 
 ambient_temperature = 25.0
 temperature_rise_per_amp = 5.0
 motor_max_temperature = 70.0
+
+rolling_resistance_coefficient = 0.02
+gravity = 9.81
+air_density = 1.225
+drag_coefficient = 1.0
+frontal_area = 0.5
+###
+def calculate_max_safe_payload(speed):
+        maximum_safe_torque = (motor_max_current * motor_torque_constant)
+
+        maximum_safe_force_per_motor = (maximum_safe_torque / wheel_radius)
+
+        maximum_safe_total_force = (maximum_safe_force_per_motor * number_of_motors)
+
+        drag_force = (0.5 * air_density * drag_coefficient * frontal_area * speed ** 2)
+
+        force_available_for_mass = (maximum_safe_total_force - drag_force)
+
+        mass_factor = (acceleration + rolling_resistance_coefficient * gravity)
+
+        maximum_safe_total_mass = (force_available_for_mass / mass_factor)
+
+        maximum_safe_payload = (maximum_safe_total_mass - robot_mass)
+        
+        return maximum_safe_payload
+# print("\nAnalytical Maximum Safe Payload by Speed:")
+
+# for speed in speeds:
+
+#     maximum_payload = calculate_max_safe_payload(speed)
+
+#     if maximum_payload < 0:
+#         print(speed, "m/s: Robot itself exceeds limit")
+    
+#     else:
+#         print(speed, "m/s:", round(maximum_payload, 2), "kg")
+
+analytical_payload_by_speed = {}
+
+for speed in speeds:
+
+    maximum_payload = calculate_max_safe_payload(speed)
+
+    analytical_payload_by_speed[speed] = maximum_payload
+
+print("\nAnalytical Payload Limits:")
+
+for speed, payload in analytical_payload_by_speed.items():
+
+    if payload < 0:
+        print(speed, "m/s: Robot itself exceeds limit")
+    else:
+        print(speed, "m/s:", round(payload, 2), "kg")
+        
+print("\nRobot Speed Capability:")
+
+for speed, payload in analytical_payload_by_speed.items():
+
+    if payload < 0:
+        print(speed, "m/s: Not achievable")
+
+    elif payload < min_payload:
+        print(speed, "m/s: Achievable only below tested payload range")
+
+    else:
+        print(speed, "m/s: Achievable within tested payload range")
+
+    
 
 scenarios = []
 
@@ -51,11 +123,15 @@ for payload in payloads:
 
         total_mass = robot_mass + payload
 
+        rolling_force = (rolling_resistance_coefficient * total_mass * gravity)
         
+        drag_force = (0.5 * air_density * drag_coefficient * frontal_area * speed ** 2)
+        
+        acceleration_force = total_mass * acceleration
 
-        required_force = total_mass * acceleration
+        required_force = acceleration_force + rolling_force + drag_force
         
-        force_per_motor = required_force / 2
+        force_per_motor = required_force / number_of_motors
 
         motor_torque = round(force_per_motor * wheel_radius, 2)
 
@@ -115,110 +191,344 @@ for payload in payloads:
 
 print("\nScenarios:")
 
-for scenario in scenarios:
-    print(scenario)
+#for scenario in scenarios:
+  #  print(scenario)
 
-safe_scenarios = []
+safe_payload_by_speed = {}
 
-for scenario in scenarios:
+for speed in speeds:
 
-    if scenario["overall_status"] == "OK":
-        safe_scenarios.append(scenario)
+    safe_payloads = []
 
-print("\nSafe Operating Scenarios:")
+    for scenario in scenarios:
 
-for scenario in safe_scenarios:
-    print(scenario)
+        if scenario["speed"] == speed and scenario["overall_status"] == "OK":
+            safe_payloads.append(scenario["payload"])
 
-max_safe_payload = max(
-    scenario["payload"]
-    for scenario in safe_scenarios
+    safe_payload_by_speed[speed] = safe_payloads
+
+print("\nSafe Payloads by Speed:")
+
+for speed, safe_payloads in safe_payload_by_speed.items():
+    print(speed, "m/s:", safe_payloads)
+
+print("\nOperating Envelope Matrix:")
+
+for speed in speeds:
+
+    print(speed, "m/s:", end=" ")
+
+    for payload in payloads:
+
+        safe = False
+
+        for scenario in scenarios:
+            if (
+                scenario["speed"] == speed
+                and scenario["payload"] == payload
+                and scenario["overall_status"] == "OK"
+            ):
+                safe = True
+                break
+
+        if safe:
+            print("✓", end=" ")
+        else:
+            print("✗", end=" ")
+
+    print()
+
+# print("\nMaximum Safe Payload by Speed:")
+
+# for speed, payloads in safe_payload_by_speed.items():
+
+#     if payloads:
+#         maximum_payload = max(payloads)
+#         print(speed, "m/s:", maximum_payload, "kg")
+
+#     else:
+#         print(speed, "m/s: No safe payload in tested range")
+
+# print("\nOperating Boundary by Speed:")
+
+# for speed, payloads in safe_payload_by_speed.items():
+
+#     if payloads:
+#         maximum_safe = max(payloads)
+
+#         print(
+#             speed,
+#             "m/s: Maximum tested safe payload =",
+#             maximum_safe,
+#             "kg"
+#         )
+
+#     else:
+#         print(
+#             speed,
+#             "m/s: No safe payload in tested range"
+#         )
+
+# print("\nAnalytical vs Tested Boundary:")
+
+# for speed in speeds:
+
+#     analytical_limit = analytical_payload_by_speed[speed]
+#     tested_payloads = safe_payload_by_speed[speed]
+
+#     if analytical_limit < 0:
+#         print(
+#             speed,
+#             "m/s: No operating point for robot"
+#         )
+
+#     elif tested_payloads:
+#         tested_limit = max(tested_payloads)
+
+#         print(
+#             speed,
+#             "m/s: Analytical =",
+#             round(analytical_limit, 2),
+#             "kg, Tested =",
+#             tested_limit,
+#             "kg"
+#         )
+
+#     else:
+#         print(
+#             speed,
+#             "m/s: Analytical =",
+#             round(analytical_limit, 2),
+#             "kg, Tested = No safe payload"
+#         )
+
+print("\nLimiting Constraint by Speed:")
+
+for speed in speeds:
+
+    speed_scenarios = []
+
+    for scenario in scenarios:
+        if scenario["speed"] == speed:
+            speed_scenarios.append(scenario)
+
+    unsafe_speed_scenarios = []
+
+    for scenario in speed_scenarios:
+        if scenario["overall_status"] == "EXCEEDED":
+            unsafe_speed_scenarios.append(scenario)
+
+    if unsafe_speed_scenarios:
+
+        first_unsafe = min(
+            unsafe_speed_scenarios,
+            key=lambda scenario: scenario["payload"]
+        )
+
+        print(
+            speed,
+            "m/s: Payload =",
+            first_unsafe["payload"],
+            "kg, Constraint =",
+            first_unsafe["limiting_constraint"]
+        )
+
+    else:
+        print(
+            speed,
+            "m/s: No unsafe scenario in tested range"
+        )
+
+print("\nFinal Operating Envelope:")
+
+for speed in speeds:
+
+    analytical_limit = analytical_payload_by_speed[speed]
+
+    if analytical_limit < 0:
+
+        print(
+            speed,
+            "m/s: No operating point"
+        )
+
+    elif analytical_limit < min_payload:
+
+        print(
+            speed,
+            "m/s: Safe only below tested payload range"
+        )
+
+    else:
+
+        print(
+            speed,
+            "m/s: Safe up to",
+            round(analytical_limit, 2),
+            "kg payload"
+        )
+
+tested_boundary_by_speed = {}
+
+for speed in speeds:
+
+    safe_payloads = safe_payload_by_speed[speed]
+
+    if safe_payloads:
+        tested_boundary_by_speed[speed] = max(safe_payloads)
+    else:
+        tested_boundary_by_speed[speed] = None
+
+plt.figure(figsize=(8, 5))
+analytical_limits = [
+    analytical_payload_by_speed[speed]
+    for speed in speeds
+]
+
+tested_limits = [
+    tested_boundary_by_speed[speed]
+    for speed in speeds
+]
+
+plt.plot(
+    speeds,
+    analytical_limits,
+    marker="o",
+    label="Analytical Limit"
 )
 
-print("\nMaximum Safe Payload:", max_safe_payload, "kg")
-
-unsafe_scenarios = []
-
-for scenario in scenarios:
-    if scenario["overall_status"] == "EXCEEDED":
-        unsafe_scenarios.append(scenario)
-
-print("\nUnsafe Operating Scenarios:")
-
-for scenario in unsafe_scenarios:
-    print(scenario)
-
-min_unsafe_payload = min(
-    scenario["payload"]
-    for scenario in unsafe_scenarios
+plt.plot(
+    speeds,
+    tested_limits,
+    marker="x",
+    label="Tested Limit"
 )
 
-print("\nMinimum Unsafe Payload:",min_unsafe_payload,"kg")
+plt.xlabel("Speed (m/s)")
+plt.ylabel("Maximum Safe Payload (kg)")
+plt.title("Robot Operating Envelope")
+plt.legend()
+plt.grid(True)
 
-boundary_scenarios = []
+plt.show()
 
-for scenario in unsafe_scenarios:
-    if scenario["payload"] == min_unsafe_payload:
-        boundary_scenarios.append(scenario)
+# safe_scenarios = []
 
-boundary_constraint = boundary_scenarios[0]["limiting_constraint"]
+# for scenario in scenarios:
 
-print("\nBoundary Constraint:", boundary_constraint)
+#     if scenario["overall_status"] == "OK":
+#         safe_scenarios.append(scenario)
 
-print("\nBoundary Scenarios:")
+# print("\nSafe Operating Scenarios:")
 
-for scenario in boundary_scenarios:
-    print(scenario)
+# if safe_scenarios:
 
-maximum_safe_current = motor_max_current
+#     max_safe_payload = max(
+#         scenario["payload"]
+#         for scenario in safe_scenarios
+#     )
 
-maximum_safe_torque = maximum_safe_current * motor_torque_constant
+#     print(
+#         "Maximum Safe Payload:",
+#         max_safe_payload,
+#         "kg"
+#     )
 
-print("\nMaximum Safe Motor Current:", maximum_safe_current, "A")
-print("Maximum Safe Motor Torque:", maximum_safe_torque,"Nm")
+# else:
 
-maximum_safe_force_per_motor = maximum_safe_torque / wheel_radius
+#     print("No safe operating scenarios found.")
 
-print(
-    "Maximum Safe Force per Motor:",
-    maximum_safe_force_per_motor,
-    "N"
-)
 
-maximum_safe_total_force = maximum_safe_force_per_motor * number_of_motors
 
-print(
-    "Maximum Safe Total Force:",
-    maximum_safe_total_force,
-    "N"
-)
 
-maximum_safe_total_mass = maximum_safe_total_force / acceleration
+# unsafe_scenarios = []
 
-print(
-    "Maximum Safe Total Mass:",
-    maximum_safe_total_mass,
-    "kg"
-)
-maximum_safe_payload = maximum_safe_total_mass - robot_mass
+# for scenario in scenarios:
+#     if scenario["overall_status"] == "EXCEEDED":
+#         unsafe_scenarios.append(scenario)
 
-print(
-    "Maximum Safe Payload:",
-    maximum_safe_payload,
-    "kg"
-)
+# print("\nUnsafe Operating Scenarios:")
 
-boundary_total_mass = robot_mass + maximum_safe_payload
+# #for scenario in unsafe_scenarios:
+# #    print(scenario)
 
-boundary_force = boundary_total_mass * acceleration
+# min_unsafe_payload = min(
+#     scenario["payload"]
+#     for scenario in unsafe_scenarios
+# )
 
-boundary_force_per_motor = boundary_force / number_of_motors
+# print("\nMinimum Unsafe Payload:",min_unsafe_payload,"kg")
 
-boundary_torque = boundary_force_per_motor * wheel_radius
+# boundary_scenarios = []
 
-boundary_current = boundary_torque / motor_torque_constant
+# for scenario in unsafe_scenarios:
+#     if scenario["payload"] == min_unsafe_payload:
+#         boundary_scenarios.append(scenario)
 
-print("\nCalculated Boundary Check:")
-print("Total Mass:", boundary_total_mass, "kg")
-print("Motor Torque:", boundary_torque, "Nm")
-print("Motor Current:", boundary_current, "A")
+# boundary_constraint = boundary_scenarios[0]["limiting_constraint"]
+
+# print("\nBoundary Constraint:", boundary_constraint)
+
+# print("\nBoundary Scenarios:")
+
+#for scenario in boundary_scenarios:
+ #   print(scenario)
+
+
+# maximum_safe_current = motor_max_current
+
+# maximum_safe_torque = maximum_safe_current * motor_torque_constant
+
+# print("\nMaximum Safe Motor Current:", maximum_safe_current, "A")
+# print("Maximum Safe Motor Torque:", maximum_safe_torque,"Nm")
+
+# maximum_safe_force_per_motor = maximum_safe_torque / wheel_radius
+
+# print(
+#     "Maximum Safe Force per Motor:",
+#     maximum_safe_force_per_motor,
+#     "N"
+# )
+
+# maximum_safe_total_force = maximum_safe_force_per_motor * number_of_motors
+
+# print(
+#     "Maximum Safe Total Force:",
+#     maximum_safe_total_force,
+#     "N"
+# )
+
+# maximum_safe_total_mass = maximum_safe_total_force / acceleration
+
+# print(
+#     "Maximum Safe Total Mass:",
+#     maximum_safe_total_mass,
+#     "kg"
+# )
+# maximum_safe_payload = maximum_safe_total_mass - robot_mass
+
+# print(
+#     "Maximum Safe Payload:",
+#     maximum_safe_payload,
+#     "kg"
+# )
+
+# boundary_total_mass = robot_mass + maximum_safe_payload
+
+# boundary_force = boundary_total_mass * acceleration
+
+# boundary_force_per_motor = boundary_force / number_of_motors
+
+# boundary_torque = boundary_force_per_motor * wheel_radius
+
+# boundary_current = boundary_torque / motor_torque_constant
+
+# print("\nCalculated Boundary Check:")
+# print("Total Mass:", boundary_total_mass, "kg")
+# print("Motor Torque:", boundary_torque, "Nm")
+# print("Motor Current:", boundary_current, "A")
+# print("Acceleration Force:", acceleration_force, "N")
+# print("Rolling Force:", rolling_force, "N")
+# print("Required Force:", required_force, "N")
+# print("Speed:", speed, "m/s")
+# print("Drag Force:", drag_force, "N")
