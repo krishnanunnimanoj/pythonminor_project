@@ -35,7 +35,7 @@ wheel_radius = 0.1
 motor_max_torque = 1.0
 acceleration = 1.0
 
-
+number_of_motors = 2
 motor_torque_constant = 0.1
 motor_max_current = 8.0
 
@@ -129,3 +129,96 @@ print("\nSafe Operating Scenarios:")
 
 for scenario in safe_scenarios:
     print(scenario)
+
+max_safe_payload = max(
+    scenario["payload"]
+    for scenario in safe_scenarios
+)
+
+print("\nMaximum Safe Payload:", max_safe_payload, "kg")
+
+unsafe_scenarios = []
+
+for scenario in scenarios:
+    if scenario["overall_status"] == "EXCEEDED":
+        unsafe_scenarios.append(scenario)
+
+print("\nUnsafe Operating Scenarios:")
+
+for scenario in unsafe_scenarios:
+    print(scenario)
+
+min_unsafe_payload = min(
+    scenario["payload"]
+    for scenario in unsafe_scenarios
+)
+
+print("\nMinimum Unsafe Payload:",min_unsafe_payload,"kg")
+
+boundary_scenarios = []
+
+for scenario in unsafe_scenarios:
+    if scenario["payload"] == min_unsafe_payload:
+        boundary_scenarios.append(scenario)
+
+boundary_constraint = boundary_scenarios[0]["limiting_constraint"]
+
+print("\nBoundary Constraint:", boundary_constraint)
+
+print("\nBoundary Scenarios:")
+
+for scenario in boundary_scenarios:
+    print(scenario)
+
+maximum_safe_current = motor_max_current
+
+maximum_safe_torque = maximum_safe_current * motor_torque_constant
+
+print("\nMaximum Safe Motor Current:", maximum_safe_current, "A")
+print("Maximum Safe Motor Torque:", maximum_safe_torque,"Nm")
+
+maximum_safe_force_per_motor = maximum_safe_torque / wheel_radius
+
+print(
+    "Maximum Safe Force per Motor:",
+    maximum_safe_force_per_motor,
+    "N"
+)
+
+maximum_safe_total_force = maximum_safe_force_per_motor * number_of_motors
+
+print(
+    "Maximum Safe Total Force:",
+    maximum_safe_total_force,
+    "N"
+)
+
+maximum_safe_total_mass = maximum_safe_total_force / acceleration
+
+print(
+    "Maximum Safe Total Mass:",
+    maximum_safe_total_mass,
+    "kg"
+)
+maximum_safe_payload = maximum_safe_total_mass - robot_mass
+
+print(
+    "Maximum Safe Payload:",
+    maximum_safe_payload,
+    "kg"
+)
+
+boundary_total_mass = robot_mass + maximum_safe_payload
+
+boundary_force = boundary_total_mass * acceleration
+
+boundary_force_per_motor = boundary_force / number_of_motors
+
+boundary_torque = boundary_force_per_motor * wheel_radius
+
+boundary_current = boundary_torque / motor_torque_constant
+
+print("\nCalculated Boundary Check:")
+print("Total Mass:", boundary_total_mass, "kg")
+print("Motor Torque:", boundary_torque, "Nm")
+print("Motor Current:", boundary_current, "A")
