@@ -1,4 +1,26 @@
 import matplotlib.pyplot as plt
+import math
+# import xml.etree.ElementTree as ET
+
+# urdf_path = "robots/my_robot.urdf"
+
+# with open(urdf_path, "r") as file:
+#     urdf_content = file.read()
+
+# print("\nURDF loaded successfully.")
+
+# root = ET.fromstring(urdf_content)
+
+# robot_mass = 0.0
+
+# for link in root.findall("link"):
+#     mass_element = link.find("inertial/mass")
+
+#     if mass_element is not None:
+#         robot_mass += float(mass_element.get("value"))
+
+# print("Robot mass from URDF:", robot_mass, "kg")
+
 def generate_range(min_value, max_value, step):
 
     values = []
@@ -16,9 +38,12 @@ def generate_range(min_value, max_value, step):
 
 
 
-robot_mass = float(input("Enter robot mass: "))
-min_payload = float(input('Enter minimum payload: '))
-max_payload = float(input('Enter maximum payload: '))
+
+
+
+robot_mass = 10 #float(input("Enter robot mass: "))
+min_payload = 2#float(input('Enter minimum payload: '))
+max_payload = 8#float(input('Enter maximum payload: '))
 
 payloads = generate_range(min_payload,max_payload,0.5)
 
@@ -27,10 +52,12 @@ payloads = generate_range(min_payload,max_payload,0.5)
 print('Payload values: ')
 print(payloads)
 
-min_speed = float(input('Enter minimum speed: '))
-max_speed = float(input('Enter maximum speed: '))
+min_speed = 2#float(input('Enter minimum speed: '))
+max_speed = 7#float(input('Enter maximum speed: '))
 
 speeds = generate_range(min_speed, max_speed,1)
+
+slope_angle = 10#float(input("Enter slope angle(degrees): "))
 
 print('Speed values: ')
 print(speeds)
@@ -52,11 +79,22 @@ gravity = 9.81
 air_density = 1.225
 drag_coefficient = 1.0
 frontal_area = 0.5
+friction_coefficient = 0.7
+gear_ratio = 2.0
+drivetrain_efficiency = 0.9
+motor_max_rpm = 3000
+battery_voltage = 24.0
+battery_max_current = 20.0
+thermal_resistance = 2.0
+thermal_capacitance = 100.0
+motor_resistance = 0.2
+analysis_time = 10.0
+turning_radius = 2.0
 ###
 def calculate_max_safe_payload(speed):
         maximum_safe_torque = (motor_max_current * motor_torque_constant)
 
-        maximum_safe_force_per_motor = (maximum_safe_torque / wheel_radius)
+        maximum_safe_force_per_motor = (maximum_safe_torque * gear_ratio * drivetrain_efficiency/ wheel_radius)
 
         maximum_safe_total_force = (maximum_safe_force_per_motor * number_of_motors)
 
@@ -64,24 +102,51 @@ def calculate_max_safe_payload(speed):
 
         force_available_for_mass = (maximum_safe_total_force - drag_force)
 
-        mass_factor = (acceleration + rolling_resistance_coefficient * gravity)
+        mass_factor = (acceleration + rolling_resistance_coefficient * gravity + gravity * math.sin(math.radians(slope_angle)))
 
+        lateral_acceleration = (speed ** 2 / turning_radius)
+
+        maximum_friction_acceleration = (friction_coefficient * gravity* math.cos(math.radians(slope_angle)))
+
+        combined_mass_acceleration = math.sqrt(mass_factor ** 2 + lateral_acceleration ** 2)
+
+        if combined_mass_acceleration >= maximum_friction_acceleration:
+            return -1
         maximum_safe_total_mass = (force_available_for_mass / mass_factor)
 
         maximum_safe_payload = (maximum_safe_total_mass - robot_mass)
-        
+
+       
         return maximum_safe_payload
-# print("\nAnalytical Maximum Safe Payload by Speed:")
 
-# for speed in speeds:
+def calculate_max_cruise_payload(speed):
 
-#     maximum_payload = calculate_max_safe_payload(speed)
+    maximum_safe_torque = (motor_max_current * motor_torque_constant)
 
-#     if maximum_payload < 0:
-#         print(speed, "m/s: Robot itself exceeds limit")
-    
-#     else:
-#         print(speed, "m/s:", round(maximum_payload, 2), "kg")
+    maximum_safe_force_per_motor = (maximum_safe_torque * gear_ratio * drivetrain_efficiency/ wheel_radius)
+
+    maximum_safe_total_force = (maximum_safe_force_per_motor * number_of_motors)
+
+    drag_force = (0.5 * air_density * drag_coefficient * frontal_area * speed ** 2)
+
+    force_available_for_mass = (maximum_safe_total_force - drag_force)
+
+    mass_factor = (rolling_resistance_coefficient * gravity + gravity * math.sin(math.radians(slope_angle)))
+
+    lateral_acceleration = (speed ** 2 / turning_radius)
+
+    maximum_friction_acceleration = (friction_coefficient * gravity * math.cos(math.radians(slope_angle)))
+
+    combined_mass_acceleration = math.sqrt(mass_factor ** 2 + lateral_acceleration ** 2)
+
+    if combined_mass_acceleration >= maximum_friction_acceleration:
+        return -1
+    maximum_safe_total_mass = (force_available_for_mass / mass_factor)
+
+    maximum_safe_payload = (maximum_safe_total_mass - robot_mass)
+
+    return maximum_safe_payload
+
 
 analytical_payload_by_speed = {}
 
@@ -90,6 +155,20 @@ for speed in speeds:
     maximum_payload = calculate_max_safe_payload(speed)
 
     analytical_payload_by_speed[speed] = maximum_payload
+
+analytical_cruise_payload_by_speed = {}
+
+for speed in speeds:
+    maximum_payload = calculate_max_cruise_payload(speed)
+    analytical_cruise_payload_by_speed[speed] = maximum_payload
+
+print("\nAnalytical Cruise Payload Limits:")
+
+for speed, payload in analytical_cruise_payload_by_speed.items():
+    if payload < 0:
+        print(speed, "m/s: Robot itself exceeds limit")
+    else:
+        print(speed, "m/s:", round(payload, 2), "kg")
 
 print("\nAnalytical Payload Limits:")
 
@@ -124,39 +203,107 @@ for payload in payloads:
         total_mass = robot_mass + payload
 
         rolling_force = (rolling_resistance_coefficient * total_mass * gravity)
+
+        slope_force = (total_mass * gravity * math.sin(math.radians(slope_angle)))
+        normal_force = (total_mass * gravity * math.cos(math.radians(slope_angle)))
+        normal_force_per_wheel = (normal_force / number_of_motors)
+        maximum_traction_force_per_wheel = (friction_coefficient * normal_force_per_wheel)
+        maximum_total_traction_force = (maximum_traction_force_per_wheel * number_of_motors)
+      
+      
         
         drag_force = (0.5 * air_density * drag_coefficient * frontal_area * speed ** 2)
         
         acceleration_force = total_mass * acceleration
 
-        required_force = acceleration_force + rolling_force + drag_force
+        acceleration_required_force = (acceleration_force + rolling_force + drag_force + slope_force)
+
+        lateral_force = (total_mass * speed ** 2 / turning_radius)
+
+        combined_traction_force = (math.sqrt(acceleration_required_force ** 2 + lateral_force ** 2))
+
+        cruise_required_force = (rolling_force + drag_force + slope_force)
         
-        force_per_motor = required_force / number_of_motors
+        acceleration_force_per_motor = (acceleration_required_force / number_of_motors)
 
-        motor_torque = round(force_per_motor * wheel_radius, 2)
+        cruise_force_per_motor = (cruise_required_force / number_of_motors)
 
-        motor_current = round(motor_torque / motor_torque_constant,2)
+        acceleration_wheel_torque = (acceleration_force_per_motor * wheel_radius)
+
+        cruise_wheel_torque = (cruise_force_per_motor * wheel_radius)
+
+        acceleration_motor_torque = (acceleration_wheel_torque / (gear_ratio * drivetrain_efficiency))
+
+        cruise_motor_torque = (cruise_wheel_torque / (gear_ratio * drivetrain_efficiency))
+
+        acceleration_motor_torque = round(acceleration_motor_torque, 2)
+
+        cruise_motor_torque = round(cruise_motor_torque, 2)
+
+        motor_current = round(acceleration_motor_torque / motor_torque_constant,2)
+
+        heat_generated = ((motor_current ** 2) * motor_resistance * analysis_time)
+
+        temperature_rise = (heat_generated / thermal_capacitance)
+
+        dynamic_motor_temperature = (ambient_temperature + temperature_rise)
+
         motor_temperature = round(ambient_temperature + motor_current * temperature_rise_per_amp,2)
-        
-        if motor_torque <= motor_max_torque:
+
+        cruise_motor_current = round(cruise_motor_torque / motor_torque_constant,2)
+
+        cruise_motor_temperature = round(ambient_temperature + cruise_motor_current * temperature_rise_per_amp,2)
+
+        wheel_rpm = (speed / (2 * math.pi * wheel_radius)) * 60
+
+        motor_rpm = (wheel_rpm * gear_ratio)
+
+        acceleration_mechanical_power = (acceleration_required_force * speed)
+
+        cruise_mechanical_power = (cruise_required_force * speed)
+
+        acceleration_electrical_power = (acceleration_mechanical_power / drivetrain_efficiency)
+
+        cruise_electrical_power = (cruise_mechanical_power / drivetrain_efficiency)
+
+        acceleration_battery_current = (acceleration_electrical_power/ battery_voltage)
+
+        cruise_battery_current = (cruise_electrical_power/ battery_voltage)
+
+        if dynamic_motor_temperature <= motor_max_temperature:
+            dynamic_temperature_status = "OK"
+        else:
+            dynamic_temperature_status = "EXCEEDED"
+        if combined_traction_force <= maximum_total_traction_force:
+            traction_status = "OK"
+        else:
+            traction_status = "EXCEEDED"
+        if (acceleration_motor_torque <= motor_max_torque and cruise_motor_torque <= motor_max_torque):
             motor_status = "OK"
         else:
             motor_status = "EXCEEDED"
 
-        if motor_current <= motor_max_current:
+        if (motor_current <= motor_max_current and cruise_motor_current <= motor_max_current):
             current_status = "OK"
         else:
             current_status = "EXCEEDED"
-
-        if motor_temperature <= motor_max_temperature:
+        if (motor_temperature <= motor_max_temperature and cruise_motor_temperature <= motor_max_temperature):
             temperature_status = "OK"
         else:
             temperature_status = "EXCEEDED"
 
-        if (motor_status == "EXCEEDED"
-            or current_status == "EXCEEDED"
-            or temperature_status == "EXCEEDED"):
-            
+        if motor_rpm <= motor_max_rpm:
+            rpm_status = "OK"
+        else:
+            rpm_status = "EXCEEDED"
+
+        if (acceleration_battery_current <= battery_max_current and cruise_battery_current <= battery_max_current):
+            battery_status = "OK"
+        else:
+             battery_status = "EXCEEDED"
+
+        if (motor_status == "EXCEEDED" or current_status == "EXCEEDED" or temperature_status == "EXCEEDED"or traction_status == "EXCEEDED" or rpm_status == "EXCEEDED" or battery_status == "EXCEEDED"):
+    
             overall_status = "EXCEEDED"
         else:
             overall_status = "OK"
@@ -169,30 +316,83 @@ for payload in payloads:
         elif temperature_status == "EXCEEDED":
             limiting_constraint = "Motor Temperature"
 
+        elif traction_status == "EXCEEDED":
+            limiting_constraint = "Traction"
+
+        elif rpm_status == "EXCEEDED":
+            limiting_constraint = "Motor RPM"
+
+        elif battery_status == "EXCEEDED":
+            limiting_constraint = "Battery Current"
+
         else:
             limiting_constraint = "None"
 
         scenario = {
             "payload":payload,
             "speed":speed,
+
             "total_mass": total_mass,
-            "required_force": required_force,
-            "motor_torque" : motor_torque,
+            "required_force": acceleration_required_force,
+
+            "acceleration_motor_torque": acceleration_motor_torque,
+            "cruise_motor_torque": cruise_motor_torque,
+
+            "acceleration_motor_current": motor_current,
+            "cruise_motor_current": cruise_motor_current,
+
+            "acceleration_motor_temperature": motor_temperature,
+            "cruise_motor_temperature": cruise_motor_temperature,
+
+            "motor_torque" : acceleration_motor_torque,
             "motor_status": motor_status,
+
             "motor_current":motor_current,
             "current_status":current_status,
+
             "motor_temperature": motor_temperature,
             "temperature_status": temperature_status,
-            "overall_status": overall_status,
-            "limiting_constraint": limiting_constraint
-        }
 
+            "heat_generated": round(heat_generated, 2),
+            "dynamic_motor_temperature": round(dynamic_motor_temperature, 2),
+            "dynamic_temperature_status": dynamic_temperature_status,
+
+            "overall_status": overall_status,
+            "limiting_constraint": limiting_constraint,
+
+            "maximum_traction_force": maximum_total_traction_force,
+            "traction_status": traction_status,
+
+            "wheel_rpm": round(wheel_rpm, 2),
+            "motor_rpm": round(motor_rpm, 2),
+            "rpm_status": rpm_status,
+
+            "acceleration_mechanical_power": round(acceleration_mechanical_power, 2),
+            "cruise_mechanical_power": round(cruise_mechanical_power, 2),
+
+            "acceleration_electrical_power": round(acceleration_electrical_power, 2),
+            "cruise_electrical_power": round(cruise_electrical_power, 2),
+
+            "acceleration_battery_current": round(acceleration_battery_current, 2),
+            "cruise_battery_current": round(cruise_battery_current, 2),
+            "battery_status": battery_status,
+            "normal_force_per_wheel": round(normal_force_per_wheel, 2),
+
+            "maximum_traction_force_per_wheel": round(maximum_traction_force_per_wheel, 2),
+
+            "maximum_total_traction_force": round(maximum_total_traction_force, 2),
+
+            "lateral_force": round(lateral_force, 2),
+
+            "combined_traction_force": round(combined_traction_force, 2),
+                    }
+        
         scenarios.append(scenario)
+
 
 print("\nScenarios:")
 
-#for scenario in scenarios:
-  #  print(scenario)
+
 
 safe_payload_by_speed = {}
 
@@ -238,69 +438,6 @@ for speed in speeds:
 
     print()
 
-# print("\nMaximum Safe Payload by Speed:")
-
-# for speed, payloads in safe_payload_by_speed.items():
-
-#     if payloads:
-#         maximum_payload = max(payloads)
-#         print(speed, "m/s:", maximum_payload, "kg")
-
-#     else:
-#         print(speed, "m/s: No safe payload in tested range")
-
-# print("\nOperating Boundary by Speed:")
-
-# for speed, payloads in safe_payload_by_speed.items():
-
-#     if payloads:
-#         maximum_safe = max(payloads)
-
-#         print(
-#             speed,
-#             "m/s: Maximum tested safe payload =",
-#             maximum_safe,
-#             "kg"
-#         )
-
-#     else:
-#         print(
-#             speed,
-#             "m/s: No safe payload in tested range"
-#         )
-
-# print("\nAnalytical vs Tested Boundary:")
-
-# for speed in speeds:
-
-#     analytical_limit = analytical_payload_by_speed[speed]
-#     tested_payloads = safe_payload_by_speed[speed]
-
-#     if analytical_limit < 0:
-#         print(
-#             speed,
-#             "m/s: No operating point for robot"
-#         )
-
-#     elif tested_payloads:
-#         tested_limit = max(tested_payloads)
-
-#         print(
-#             speed,
-#             "m/s: Analytical =",
-#             round(analytical_limit, 2),
-#             "kg, Tested =",
-#             tested_limit,
-#             "kg"
-#         )
-
-#     else:
-#         print(
-#             speed,
-#             "m/s: Analytical =",
-#             round(analytical_limit, 2),
-#             "kg, Tested = No safe payload"
-#         )
 
 print("\nLimiting Constraint by Speed:")
 
@@ -392,17 +529,17 @@ tested_limits = [
 
 plt.plot(
     speeds,
-    analytical_limits,
-    marker="o",
-    label="Analytical Limit"
-)
+     analytical_limits,
+     marker="o",
+     label="Analytical Limit"
+ )
 
 plt.plot(
-    speeds,
-    tested_limits,
-    marker="x",
-    label="Tested Limit"
-)
+     speeds,
+     tested_limits,
+     marker="x",
+     label="Tested Limit"
+ )
 
 plt.xlabel("Speed (m/s)")
 plt.ylabel("Maximum Safe Payload (kg)")
@@ -411,124 +548,3 @@ plt.legend()
 plt.grid(True)
 
 plt.show()
-
-# safe_scenarios = []
-
-# for scenario in scenarios:
-
-#     if scenario["overall_status"] == "OK":
-#         safe_scenarios.append(scenario)
-
-# print("\nSafe Operating Scenarios:")
-
-# if safe_scenarios:
-
-#     max_safe_payload = max(
-#         scenario["payload"]
-#         for scenario in safe_scenarios
-#     )
-
-#     print(
-#         "Maximum Safe Payload:",
-#         max_safe_payload,
-#         "kg"
-#     )
-
-# else:
-
-#     print("No safe operating scenarios found.")
-
-
-
-
-# unsafe_scenarios = []
-
-# for scenario in scenarios:
-#     if scenario["overall_status"] == "EXCEEDED":
-#         unsafe_scenarios.append(scenario)
-
-# print("\nUnsafe Operating Scenarios:")
-
-# #for scenario in unsafe_scenarios:
-# #    print(scenario)
-
-# min_unsafe_payload = min(
-#     scenario["payload"]
-#     for scenario in unsafe_scenarios
-# )
-
-# print("\nMinimum Unsafe Payload:",min_unsafe_payload,"kg")
-
-# boundary_scenarios = []
-
-# for scenario in unsafe_scenarios:
-#     if scenario["payload"] == min_unsafe_payload:
-#         boundary_scenarios.append(scenario)
-
-# boundary_constraint = boundary_scenarios[0]["limiting_constraint"]
-
-# print("\nBoundary Constraint:", boundary_constraint)
-
-# print("\nBoundary Scenarios:")
-
-#for scenario in boundary_scenarios:
- #   print(scenario)
-
-
-# maximum_safe_current = motor_max_current
-
-# maximum_safe_torque = maximum_safe_current * motor_torque_constant
-
-# print("\nMaximum Safe Motor Current:", maximum_safe_current, "A")
-# print("Maximum Safe Motor Torque:", maximum_safe_torque,"Nm")
-
-# maximum_safe_force_per_motor = maximum_safe_torque / wheel_radius
-
-# print(
-#     "Maximum Safe Force per Motor:",
-#     maximum_safe_force_per_motor,
-#     "N"
-# )
-
-# maximum_safe_total_force = maximum_safe_force_per_motor * number_of_motors
-
-# print(
-#     "Maximum Safe Total Force:",
-#     maximum_safe_total_force,
-#     "N"
-# )
-
-# maximum_safe_total_mass = maximum_safe_total_force / acceleration
-
-# print(
-#     "Maximum Safe Total Mass:",
-#     maximum_safe_total_mass,
-#     "kg"
-# )
-# maximum_safe_payload = maximum_safe_total_mass - robot_mass
-
-# print(
-#     "Maximum Safe Payload:",
-#     maximum_safe_payload,
-#     "kg"
-# )
-
-# boundary_total_mass = robot_mass + maximum_safe_payload
-
-# boundary_force = boundary_total_mass * acceleration
-
-# boundary_force_per_motor = boundary_force / number_of_motors
-
-# boundary_torque = boundary_force_per_motor * wheel_radius
-
-# boundary_current = boundary_torque / motor_torque_constant
-
-# print("\nCalculated Boundary Check:")
-# print("Total Mass:", boundary_total_mass, "kg")
-# print("Motor Torque:", boundary_torque, "Nm")
-# print("Motor Current:", boundary_current, "A")
-# print("Acceleration Force:", acceleration_force, "N")
-# print("Rolling Force:", rolling_force, "N")
-# print("Required Force:", required_force, "N")
-# print("Speed:", speed, "m/s")
-# print("Drag Force:", drag_force, "N")
