@@ -31,8 +31,9 @@ class URDFParser:
                     total_mass += float(mass.get("value"))
 
         return total_mass
-
     def get_wheel_radius(self):
+
+        wheel_radii = []
 
         for link in self.root.findall("link"):
 
@@ -49,14 +50,38 @@ class URDFParser:
                         cylinder = geometry.find("cylinder")
 
                         if cylinder is not None:
-                            return float(cylinder.get("radius"))
 
-        return None
+                            radius = float(cylinder.get("radius"))
+                            wheel_radii.append(radius)
+
+        if not wheel_radii:
+            return None
+
+        first_radius = wheel_radii[0]
+
+        for radius in wheel_radii:
+
+            if radius != first_radius:
+                raise ValueError("Wheel radii are not consistent.")
+
+        return first_radius
+
+    def get_wheel_count(self):
+
+        wheel_count = 0
+
+        for link in self.root.findall("link"):
+
+            if "wheel" in link.get("name", ""):
+                wheel_count += 1
+
+        return wheel_count
 
     def get_robot_parameters(self):
 
         robot_mass = self.get_total_mass()
         wheel_radius = self.get_wheel_radius()
+        wheel_count = self.get_wheel_count()
 
         if robot_mass <= 0:
             raise ValueError("Robot mass must be greater than zero.")
@@ -64,7 +89,11 @@ class URDFParser:
         if wheel_radius is None or wheel_radius <= 0:
             raise ValueError("Valid wheel radius not found in URDF.")
 
+        if wheel_count <= 0:
+            raise ValueError("No wheels found in URDF.")
+
         return {
             "robot_mass": robot_mass,
-            "wheel_radius": wheel_radius
+            "wheel_radius": wheel_radius,
+            "wheel_count": wheel_count
         }

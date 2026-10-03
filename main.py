@@ -19,7 +19,7 @@ def load_robot(urdf_path):
             robot_mass=robot_data["robot_mass"],
             wheel_radius=robot_data["wheel_radius"]
         )
-
+        robot.number_of_motors = robot_data["wheel_count"]
         return robot
 
     except ValueError as error:
@@ -76,6 +76,7 @@ if robot is None:
 
 print(f"\nRobot mass: {robot.robot_mass:.2f} kg")
 print(f"Wheel radius: {robot.wheel_radius:.2f} m")
+print(f"Wheel count: {robot.number_of_motors}")
 
 analyzer = PhysicsAnalyzer(robot)
 
