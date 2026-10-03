@@ -1,10 +1,28 @@
-from html import parser
 import os
+import yaml
 import matplotlib.pyplot as plt
 from analyzer import RobotParameters, PhysicsAnalyzer
 from urdf_parser import URDFParser
 
-def load_robot(urdf_path):
+def load_config(config_path):
+
+    if not os.path.isfile(config_path):
+        print(f"\nConfiguration file not found: {config_path}")
+        return None
+
+    try:
+
+        with open(config_path, "r") as file:
+            config = yaml.safe_load(file)
+
+        return config
+
+    except yaml.YAMLError as error:
+
+        print(f"\nConfiguration error: {error}")
+        return None
+
+def load_robot(urdf_path,config):
 
     if not os.path.isfile(urdf_path):
         print(f"\nURDF file not found: {urdf_path}")
@@ -17,7 +35,8 @@ def load_robot(urdf_path):
 
         robot = RobotParameters(
             robot_mass=robot_data["robot_mass"],
-            wheel_radius=robot_data["wheel_radius"]
+            wheel_radius=robot_data["wheel_radius"],
+            config=config
         )
         robot.number_of_motors = robot_data["wheel_count"]
         return robot
@@ -67,13 +86,18 @@ def get_user_inputs():
    
     return (min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle)
 
+config = load_config("configs/robot.yaml")
+
+if config is None:
+    exit()
+
 urdf_path = get_urdf_path()
 
-robot = load_robot(urdf_path)
+robot = load_robot(urdf_path, config)
 
 if robot is None:
     exit()
-
+    
 print(f"\nRobot mass: {robot.robot_mass:.2f} kg")
 print(f"Wheel radius: {robot.wheel_radius:.2f} m")
 print(f"Wheel count: {robot.number_of_motors}")

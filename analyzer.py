@@ -1,6 +1,6 @@
 import math
 class RobotParameters:
-    def __init__(self,robot_mass = 10.0,wheel_radius = 0.1):
+    def __init__(self,robot_mass = 10.0,wheel_radius = 0.1,config = None):
         
         self.robot_mass = robot_mass
 
@@ -40,6 +40,37 @@ class RobotParameters:
         self.analysis_time = 10.0
 
         self.turning_radius = 2.0
+
+        if config is not None:
+
+            self.motor_max_torque = config["motor"]["max_torque"]
+            self.motor_torque_constant = config["motor"]["torque_constant"]
+            self.motor_max_current = config["motor"]["max_current"]
+            self.motor_max_rpm = config["motor"]["max_rpm"]
+
+            self.gear_ratio = config["drivetrain"]["gear_ratio"]
+            self.drivetrain_efficiency = config["drivetrain"]["efficiency"]
+
+            self.battery_voltage = config["battery"]["voltage"]
+            self.battery_max_current = config["battery"]["max_current"]
+
+            self.ambient_temperature = config["thermal"]["ambient_temperature"]
+            self.temperature_rise_per_amp = config["thermal"]["temperature_rise_per_amp"]
+            self.motor_max_temperature = config["thermal"]["max_temperature"]
+            self.thermal_resistance = config["thermal"]["thermal_resistance"]
+            self.thermal_capacitance = config["thermal"]["thermal_capacitance"]
+            self.motor_resistance = config["thermal"]["motor_resistance"]
+            self.analysis_time = config["thermal"]["analysis_time"]
+
+            self.rolling_resistance_coefficient = config["environment"]["rolling_resistance_coefficient"]
+            self.air_density = config["environment"]["air_density"]
+            self.drag_coefficient = config["environment"]["drag_coefficient"]
+            self.frontal_area = config["environment"]["frontal_area"]
+            self.friction_coefficient = config["environment"]["friction_coefficient"]
+            self.gravity = config["environment"]["gravity"]
+
+            self.acceleration = config["vehicle"]["acceleration"]
+            self.turning_radius = config["vehicle"]["turning_radius"]
 
 
 class PhysicsAnalyzer:
