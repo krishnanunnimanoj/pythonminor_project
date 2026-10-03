@@ -1,10 +1,17 @@
+from html import parser
+import os
 import matplotlib.pyplot as plt
 from analyzer import RobotParameters, PhysicsAnalyzer
 from urdf_parser import URDFParser
 
-def load_robot():
+def load_robot(urdf_path):
 
-    parser = URDFParser("robots/my_robot.urdf")
+   
+    if not os.path.isfile(urdf_path):
+        print(f"\nURDF file not found: {urdf_path}")
+        return None
+
+    parser = URDFParser(urdf_path)
 
     robot_data = parser.get_robot_parameters()
 
@@ -15,11 +22,27 @@ def load_robot():
 
     return robot
 
+def get_urdf_path():
+
+    while True:
+
+        print("\nRobot configuration")
+
+        urdf_path = input("URDF file path: ")
+
+        if os.path.isfile(urdf_path):
+            return urdf_path
+
+        print(f"\nURDF file not found: {urdf_path}")
+        print("Please enter a valid URDF file path.")
+
 def get_user_inputs():
 
     print("\n========================================")
     print("   ROBOT OPERATING ENVELOPE ANALYZER")
     print("========================================")
+
+   
 
     print("\nEnter payload range")
 
@@ -37,10 +60,22 @@ def get_user_inputs():
 
     slope_angle = float(input("Slope angle (degrees): "))
 
+   
     return (min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle)
 
-robot = load_robot()
+urdf_path = get_urdf_path()
+
+robot = load_robot(urdf_path)
+
+if robot is None:
+    exit()
+
+print(f"\nRobot mass: {robot.robot_mass:.2f} kg")
+print(f"Wheel radius: {robot.wheel_radius:.2f} m")
+
 analyzer = PhysicsAnalyzer(robot)
+
+(min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle) = get_user_inputs()
 
 
 def generate_range(min_value, max_value, step):
@@ -57,7 +92,7 @@ def generate_range(min_value, max_value, step):
 
     return values
 
-(min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle) = get_user_inputs()
+
 
 payloads = generate_range(min_payload,max_payload,payload_step)
 
