@@ -1,49 +1,9 @@
 import os
-import yaml
-import matplotlib.pyplot as plt
-from analyzer import RobotParameters, PhysicsAnalyzer
-from urdf_parser import URDFParser
-
-def load_config(config_path):
-
-    if not os.path.isfile(config_path):
-        print(f"\nConfiguration file not found: {config_path}")
-        return None
-
-    try:
-
-        with open(config_path, "r") as file:
-            config = yaml.safe_load(file)
-
-        return config
-
-    except yaml.YAMLError as error:
-
-        print(f"\nConfiguration error: {error}")
-        return None
-
-def load_robot(urdf_path,config):
-
-    if not os.path.isfile(urdf_path):
-        print(f"\nURDF file not found: {urdf_path}")
-        return None
-
-    try:
-        parser = URDFParser(urdf_path)
-
-        robot_data = parser.get_robot_parameters()
-
-        robot = RobotParameters(
-            robot_mass=robot_data["robot_mass"],
-            wheel_radius=robot_data["wheel_radius"],
-            config=config
-        )
-        robot.number_of_motors = robot_data["wheel_count"]
-        return robot
-
-    except ValueError as error:
-        print(f"\nURDF error: {error}")
-        return None
+from analyzer import PhysicsAnalyzer
+from config_loader import ConfigLoader
+from robot_loader import RobotLoader
+from operating_envelope import OperatingEnvelopeAnalyzer
+from result_view import ResultView
 
 def get_urdf_path():
 
@@ -86,18 +46,25 @@ def get_user_inputs():
    
     return (min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle)
 
-config = load_config("configs/robot.yaml")
+config_loader = ConfigLoader("configs/robot.yaml")
 
-if config is None:
+try:
+    config = config_loader.load()
+
+except (FileNotFoundError, ValueError) as error:
+    print(f"\n{error}")
     exit()
-
 urdf_path = get_urdf_path()
 
-robot = load_robot(urdf_path, config)
+robot_loader = RobotLoader(urdf_path, config)
 
-if robot is None:
+try:
+    robot = robot_loader.load()
+
+except (FileNotFoundError, ValueError) as error:
+    print(f"\n{error}")
     exit()
-    
+
 print(f"\nRobot mass: {robot.robot_mass:.2f} kg")
 print(f"Wheel radius: {robot.wheel_radius:.2f} m")
 print(f"Wheel count: {robot.number_of_motors}")
@@ -127,156 +94,47 @@ payloads = generate_range(min_payload,max_payload,payload_step)
 
 speeds = generate_range(min_speed,max_speed,speed_step)
 
-analytical_payload_by_speed = {}
+envelope_analyzer = OperatingEnvelopeAnalyzer(analyzer)
 
-for speed in speeds:
+envelope_results = envelope_analyzer.calculate(payloads,speeds,slope_angle)
 
-    maximum_payload = analyzer.calculate_max_safe_payload(speed,slope_angle)
+analytical_payload_by_speed = (
+    envelope_results["analytical_payload_by_speed"]
+)
 
-    analytical_payload_by_speed[speed] = maximum_payload
+analytical_cruise_payload_by_speed = (
+    envelope_results["analytical_cruise_payload_by_speed"]
+)
 
-analytical_cruise_payload_by_speed = {}
+safe_payload_by_speed = (
+    envelope_results["safe_payload_by_speed"]
+)
 
-for speed in speeds:
-    maximum_payload = analyzer.calculate_max_cruise_payload(speed,slope_angle)
-    analytical_cruise_payload_by_speed[speed] = maximum_payload
+tested_boundary_by_speed = (
+    envelope_results["tested_boundary_by_speed"]
+)
 
+limiting_constraint_by_speed = (
+    envelope_results["limiting_constraint_by_speed"]
+)
 
-scenarios = []
+operating_envelope_matrix = (
+    envelope_results["operating_envelope_matrix"]
+)
 
-for payload in payloads:
-    
-    for speed in speeds:
+result_view = ResultView()
 
-        scenario = analyzer.analyze_scenario(payload, speed, slope_angle)
-
-        scenarios.append(scenario)
-
-results = analyzer.analyze_operating_envelope(scenarios,speeds)
-
-safe_payload_by_speed = results["safe_payload_by_speed"]
-
-tested_boundary_by_speed = results["tested_boundary_by_speed"]
-
-limiting_constraint_by_speed = results["limiting_constraint_by_speed"]
-
-operating_envelope_matrix = results["operating_envelope_matrix"]
-
-print("\n========================================")
-print("        OPERATING ENVELOPE RESULTS")
-print("========================================")
-
-print("\nAnalytical Payload Limits:")
-print("----------------------------------------")
-
-for speed, payload in analytical_payload_by_speed.items():
-
-    if payload < 0:
-        print(f"{speed:.1f} m/s: Not achievable")
-    else:
-        print(f"{speed:.1f} m/s: {payload:.2f} kg")
-
-
-print("\nAnalytical Cruise Payload Limits:")
-print("----------------------------------------")
-
-for speed, payload in analytical_cruise_payload_by_speed.items():
-
-    if payload < 0:
-        print(f"{speed:.1f} m/s: Not achievable")
-    else:
-        print(f"{speed:.1f} m/s: {payload:.2f} kg")
-
-
-print("\nRobot Speed Capability:")
-print("----------------------------------------")
-
-for speed, payload in analytical_payload_by_speed.items():
-
-    if payload < 0:
-        print(f"{speed:.1f} m/s: Not achievable")
-
-    elif payload < min_payload:
-        print(f"{speed:.1f} m/s: Achievable only below tested payload range")
-
-    else:
-        print(f"{speed:.1f} m/s: Achievable within tested payload range")
-
-
-print("\nFinal Operating Envelope:")
-print("----------------------------------------")
-
-for speed in speeds:
-
-    analytical_limit = analytical_payload_by_speed[speed]
-
-    if analytical_limit < 0:
-        print(f"{speed:.1f} m/s: No operating point")
-
-    elif analytical_limit < min_payload:
-        print(
-            f"{speed:.1f} m/s: "
-            "Safe only below tested payload range"
-        )
-
-    else:
-        print(
-            f"{speed:.1f} m/s: "
-            f"Safe up to {analytical_limit:.2f} kg payload"
-        )
-
-
-print("\nLimiting Constraint:")
-print("----------------------------------------")
-
-for speed in speeds:
-
-    constraint = limiting_constraint_by_speed[speed]
-
-    if constraint is None:
-
-        print(
-            f"{speed:.1f} m/s: "
-            "No unsafe scenario in tested range"
-        )
-
-    else:
-
-        print(
-            f"{speed:.1f} m/s: "
-            f"{constraint['constraint']}"
-        )
-
-
-plt.figure(figsize=(8, 5))
-analytical_limits = [
-    analytical_payload_by_speed[speed]
-    for speed in speeds
-]
-
-tested_limits = [
-    tested_boundary_by_speed[speed]
-    for speed in speeds
-]
-
-plt.plot(
+result_view.print_results(
+    analytical_payload_by_speed,
+    analytical_cruise_payload_by_speed,
+    safe_payload_by_speed,
+    limiting_constraint_by_speed,
     speeds,
-     analytical_limits,
-     marker="o",
-     label="Analytical Limit"
- )
+    min_payload
+)
 
-plt.plot(
-     speeds,
-     tested_limits,
-     marker="x",
-     label="Tested Limit"
- )
-
-plt.xlabel("Speed (m/s)")
-plt.ylabel("Maximum Safe Payload (kg)")
-plt.title("Robot Operating Envelope")
-plt.legend()
-plt.grid(True)
-
-plt.show()
+result_view.plot_results(
+    analytical_payload_by_speed,
+    tested_boundary_by_speed,
+    speeds
+)
