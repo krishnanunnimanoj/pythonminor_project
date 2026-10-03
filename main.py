@@ -6,21 +6,25 @@ from urdf_parser import URDFParser
 
 def load_robot(urdf_path):
 
-   
     if not os.path.isfile(urdf_path):
         print(f"\nURDF file not found: {urdf_path}")
         return None
 
-    parser = URDFParser(urdf_path)
+    try:
+        parser = URDFParser(urdf_path)
 
-    robot_data = parser.get_robot_parameters()
+        robot_data = parser.get_robot_parameters()
 
-    robot = RobotParameters(
-        robot_mass=robot_data["robot_mass"],
-        wheel_radius=robot_data["wheel_radius"]
-    )
+        robot = RobotParameters(
+            robot_mass=robot_data["robot_mass"],
+            wheel_radius=robot_data["wheel_radius"]
+        )
 
-    return robot
+        return robot
+
+    except ValueError as error:
+        print(f"\nURDF error: {error}")
+        return None
 
 def get_urdf_path():
 
