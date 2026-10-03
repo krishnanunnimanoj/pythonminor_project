@@ -1,9 +1,6 @@
 import os
-from analyzer import PhysicsAnalyzer
-from config_loader import ConfigLoader
-from robot_loader import RobotLoader
-from operating_envelope import OperatingEnvelopeAnalyzer
 from result_view import ResultView
+from application import Application
 
 def get_urdf_path():
 
@@ -46,57 +43,25 @@ def get_user_inputs():
    
     return (min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle)
 
-config_loader = ConfigLoader("configs/robot.yaml")
+app = Application()
 
-try:
-    config = config_loader.load()
-
-except (FileNotFoundError, ValueError) as error:
-    print(f"\n{error}")
+if not app.load_configuration():
     exit()
+
 urdf_path = get_urdf_path()
 
-robot_loader = RobotLoader(urdf_path, config)
-
-try:
-    robot = robot_loader.load()
-
-except (FileNotFoundError, ValueError) as error:
-    print(f"\n{error}")
+if not app.load_robot(urdf_path):
     exit()
 
-print(f"\nRobot mass: {robot.robot_mass:.2f} kg")
-print(f"Wheel radius: {robot.wheel_radius:.2f} m")
-print(f"Wheel count: {robot.number_of_motors}")
+app.create_analyzers()
 
-analyzer = PhysicsAnalyzer(robot)
+analyzer = app.analyzer
+envelope_analyzer = app.envelope_analyzer
 
 (min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle) = get_user_inputs()
 
 
-def generate_range(min_value, max_value, step):
-
-    values = []
-
-    current_value = min_value
-
-    while current_value <= max_value:
-
-        values.append(round(current_value, 2))
-
-        current_value += step
-
-    return values
-
-
-
-payloads = generate_range(min_payload,max_payload,payload_step)
-
-speeds = generate_range(min_speed,max_speed,speed_step)
-
-envelope_analyzer = OperatingEnvelopeAnalyzer(analyzer)
-
-envelope_results = envelope_analyzer.calculate(payloads,speeds,slope_angle)
+payloads, speeds, envelope_results = app.run_analysis(min_payload,max_payload,payload_step,min_speed,max_speed,speed_step,slope_angle)
 
 analytical_payload_by_speed = (
     envelope_results["analytical_payload_by_speed"]
