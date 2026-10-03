@@ -82,7 +82,7 @@
 -->
 <robot name="envelope_test_robot">
 
-  <!-- ===================== MATERIALS ===================== -->
+  <!-- MATERIALS -->
   <material name="chassis_blue">
     <color rgba="0.15 0.35 0.75 1.0"/>
   </material>
@@ -90,7 +90,7 @@
     <color rgba="0.08 0.08 0.08 1.0"/>
   </material>
 
-  <!-- ===================== BASE LINK (CHASSIS) ===================== -->
+ <!-- BASE LINK (CHASSIS) -->
   <!-- Origin at the geometric centre of the chassis box; CoM coincides with it.
        Chassis spans z = -0.10 .. +0.10 in this frame (0.10 .. 0.30 m above ground). -->
   <link name="base_link">
@@ -116,11 +116,11 @@
     </inertial>
   </link>
 
-  <!-- ===================== WHEELS =====================
-       Wheel link frame: origin at wheel centre, y axis along the axle.
-       Joint z = -0.10 m in the base_link frame (= 0.10 m above ground). -->
+  <!-- WHEELS
+     Wheel link frame: origin at wheel centre, y axis along the axle.
+     Joint z = -0.10 m in the base_link frame (= 0.10 m above ground). -->
 
-  <!-- ---------- Front Left Wheel (ground frame: 0.20, +0.25, 0.10) ---------- -->
+ <!-- Front Left Wheel (ground frame: 0.20, +0.25, 0.10) -->
   <link name="front_left_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -152,7 +152,7 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  <!-- ---------- Rear Left Wheel (ground frame: -0.20, +0.25, 0.10) ---------- -->
+  <!-- Rear Left Wheel (ground frame: -0.20, +0.25, 0.10) -->
   <link name="rear_left_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -184,7 +184,7 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  <!-- ---------- Front Right Wheel (ground frame: 0.20, -0.25, 0.10) ---------- -->
+  <!-- Front Right Wheel (ground frame: 0.20, -0.25, 0.10) -->
   <link name="front_right_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -215,8 +215,7 @@
     <axis xyz="0 1 0"/>
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
-
-  <!-- ---------- Rear Right Wheel (ground frame: -0.20, -0.25, 0.10) ---------- -->
+<!-- Rear Right Wheel (ground frame: -0.20, -0.25, 0.10) -->
   <link name="rear_right_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -248,7 +247,7 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  <!-- ===================== GAZEBO PROPERTIES =====================
+  <!-- GAZEBO PROPERTIES
        Material colours plus basic wheel-ground contact parameters.
        mu1/mu2 = friction coefficients, kp/kd = contact stiffness/damping,
        minDepth/maxVel = contact solver tuning (Gazebo Classic tags; harmless

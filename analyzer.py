@@ -1,10 +1,10 @@
 import math
 class RobotParameters:
-    def __init__(self):
+    def __init__(self,robot_mass = 10.0,wheel_radius = 0.1):
         
-        self.robot_mass = 10
+        self.robot_mass = robot_mass
 
-        self.wheel_radius = 0.1
+        self.wheel_radius = wheel_radius
         self.motor_max_torque = 1.0
         self.acceleration = 1.0
 
