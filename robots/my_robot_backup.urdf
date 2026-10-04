@@ -1,8 +1,88 @@
 <?xml version="1.0"?>
+<!--
+  my_robot.urdf
+  Robot: envelope_test_robot
+  Purpose: Simple 4-wheel differential-drive test robot for a Python-based
+           Robot Operating Envelope Analyzer, with later Gazebo / ROS 2 validation.
 
+  COORDINATE CONVENTIONS (REP-103)
+    x = forward, y = left, z = up. Units: metres, kilograms, seconds, radians.
+    base_link origin = geometric centre of the chassis box (and its CoM).
+
+  HEIGHT REFERENCE (important)
+    Specified heights are measured from the GROUND (z_ground = 0):
+      wheel axle height        = 0.10 m  (= wheel radius, so wheels touch ground)
+      chassis bottom           = 0.10 m  (same height as the wheel centres)
+      chassis centre (base_link) = 0.10 + 0.20/2 = 0.20 m above ground
+    Because base_link sits 0.20 m above the ground, every ground-referenced
+    height is converted into the base_link frame by subtracting 0.20 m:
+      wheel joint z (base_link frame) = 0.10 - 0.20 = -0.10 m
+      ground plane   (base_link frame) = -0.20 m
+      chassis bottom (base_link frame) = -0.10 m
+    Ground-frame wheel centres (as specified):
+      front-left  ( 0.20, +0.25, 0.10)    rear-left  (-0.20, +0.25, 0.10)
+      front-right ( 0.20, -0.25, 0.10)    rear-right (-0.20, -0.25, 0.10)
+    The same points in the base_link frame (used by the joints below) are
+      (+/-0.20, +/-0.25, -0.10).
+    A spawner (Gazebo / ROS 2) should place base_link at z = 0.20 m so the
+    wheels rest exactly on the ground.
+
+  KEY DIMENSIONS
+    Chassis box            : 0.60 (L, x) x 0.50 (W, y) x 0.20 (H, z) m
+    Wheel radius           : 0.10 m
+    Wheel width            : 0.05 m
+    Wheelbase (front-rear) : 0.40 m  (axles at x = +/-0.20)
+    Track width (L-R)      : 0.50 m  (wheel centre-planes at y = +/-0.25)
+    Ground clearance       : 0.10 m  (chassis underside to ground)
+    Note: the wheel centre-planes lie on the chassis side faces (y = +/-0.25),
+    so each wheel overlaps the chassis side wall by 0.025 m, and the top of each
+    wheel reaches the chassis underside height. Parent/child links joined by a
+    joint do not collide in Gazebo, so this is acceptable for a test robot.
+
+  DRIVETRAIN (for the analyzer)
+    Layout                  : 4-wheel skid-steer / differential drive
+    number_of_motors        : 4  (one motor per wheel, all 4 wheels driven)
+    Left side               : front_left_wheel_joint, rear_left_wheel_joint
+    Right side              : front_right_wheel_joint, rear_right_wheel_joint
+    Left wheels are commanded together (same velocity); right wheels likewise.
+    This is done by the controller / analyzer, NOT by <mimic> tags, so that
+    each wheel remains an independent joint with its own motor.
+    number_of_motors is NOT a URDF concept; it belongs in the separate robot
+    configuration YAML (motors, gear ratio, torque/current limits).
+    No steering joints, suspension, differentials or transmissions are modelled.
+
+  WHEEL AXIS / DIRECTION
+    All four wheel joints use axis (0 1 0) (the wheel-link Y axis = axle).
+    Positive rotation about +Y (right-hand rule) rolls a wheel toward +X for
+    both left and right sides, so a positive joint velocity = forward motion
+    consistently on all four wheels. Forward speed v = omega * 0.10 m.
+    Cylinder geometry (natively along z) is rotated by roll = pi/2 so its
+    axis lies along the axle (y).
+
+  MASSES
+    Chassis      : 10.0 kg
+    Each wheel   :  1.0 kg (x4 = 4.0 kg)
+    Total robot  : 14.0 kg (payload is NOT included; supplied by the analyzer)
+
+  NOT INCLUDED (by design)
+    - Payload mass: provided separately by the analyzer.
+    - Motor torque/current/speed limits: supplied via a separate robot
+      configuration YAML file. Continuous joints therefore carry no <limit>.
+    - Controllers / plugins: to be added later for the Gazebo + ROS 2 stage.
+
+  INERTIA FORMULAS
+    Solid box (mass m, dims x=L, y=W, z=H):
+      Ixx = m/12 (W^2 + H^2)   Iyy = m/12 (L^2 + H^2)   Izz = m/12 (L^2 + W^2)
+      Chassis: Ixx = 10/12*(0.25+0.04) = 0.241667
+               Iyy = 10/12*(0.36+0.04) = 0.333333
+               Izz = 10/12*(0.36+0.25) = 0.508333
+    Solid cylinder (mass m, radius r, length h), axle along the link's y axis:
+      I_axle (iyy)            = 1/2 m r^2         = 0.5*1*0.01 = 0.005
+      I_transverse (ixx, izz) = m/12 (3r^2 + h^2) = (0.03+0.0025)/12 = 0.0027083
+-->
 <robot name="envelope_test_robot">
 
-  
+  <!-- MATERIALS -->
   <material name="chassis_blue">
     <color rgba="0.15 0.35 0.75 1.0"/>
   </material>
@@ -10,8 +90,9 @@
     <color rgba="0.08 0.08 0.08 1.0"/>
   </material>
 
- 
-  
+ <!-- BASE LINK (CHASSIS) -->
+  <!-- Origin at the geometric centre of the chassis box; CoM coincides with it.
+       Chassis spans z = -0.10 .. +0.10 in this frame (0.10 .. 0.30 m above ground). -->
   <link name="base_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -35,9 +116,11 @@
     </inertial>
   </link>
 
-  
+  <!-- WHEELS
+     Wheel link frame: origin at wheel centre, y axis along the axle.
+     Joint z = -0.10 m in the base_link frame (= 0.10 m above ground). -->
 
- 
+ <!-- Front Left Wheel (ground frame: 0.20, +0.25, 0.10) -->
   <link name="front_left_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -69,7 +152,7 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  
+  <!-- Rear Left Wheel (ground frame: -0.20, +0.25, 0.10) -->
   <link name="rear_left_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -101,7 +184,7 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  
+  <!-- Front Right Wheel (ground frame: 0.20, -0.25, 0.10) -->
   <link name="front_right_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -132,7 +215,7 @@
     <axis xyz="0 1 0"/>
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
-
+<!-- Rear Right Wheel (ground frame: -0.20, -0.25, 0.10) -->
   <link name="rear_right_wheel">
     <visual>
       <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -164,7 +247,11 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-  
+  <!-- GAZEBO PROPERTIES
+       Material colours plus basic wheel-ground contact parameters.
+       mu1/mu2 = friction coefficients, kp/kd = contact stiffness/damping,
+       minDepth/maxVel = contact solver tuning (Gazebo Classic tags; harmless
+       for gz-sim). Tune later during validation. No plugins/controllers yet. -->
   <gazebo reference="base_link">
     <material>Gazebo/Blue</material>
   </gazebo>

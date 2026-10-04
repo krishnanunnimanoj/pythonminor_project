@@ -250,4 +250,41 @@
 
   </plugin>
 </gazebo>
+
+  <link name="payload_5kg">
+
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia
+        ixx="0.020833"
+        ixy="0"
+        ixz="0"
+        iyy="0.020833"
+        iyz="0"
+        izz="0.033333"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.30 0.30 0.20"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.30 0.30 0.20"/>
+      </geometry>
+    </collision>
+
+  </link>
+
+  <joint name="payload_5kg_fixed_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="payload_5kg"/>
+    <origin xyz="0 0 0.20" rpy="0 0 0"/>
+  </joint>
+
 </robot>
