@@ -38,6 +38,7 @@ class VelocityTest(Node):
         self.latest_velocity = 0.0
         self.target_reached = False
         self.reach_time = None
+        self.test_finished = False
 
         self.get_logger().info(
             f"Starting velocity test: {self.target_speed} m/s"
@@ -95,8 +96,8 @@ class VelocityTest(Node):
                 f"Final measured velocity: "
                 f"{self.latest_velocity:.3f} m/s"
             )
-
-            rclpy.shutdown()
+            self.test_finished = True
+            self.destroy_timer(self.timer)
 
 
 def main(args=None):
@@ -105,10 +106,23 @@ def main(args=None):
 
     node = VelocityTest()
 
-    rclpy.spin(node)
+    try:
 
-    node.destroy_node()
+        while rclpy.ok() and not node.test_finished:
+            rclpy.spin_once(
+                node,
+                timeout_sec=0.1
+            )
 
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+
+        node.destroy_node()
+
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

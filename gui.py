@@ -1,5 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import subprocess
+import threading
+import os
+import signal
 
 from application import Application
 
@@ -20,6 +24,7 @@ class RobotEnvelopeGUI:
         self.root.minsize(900,700)
 
         self.application = Application()
+        self.gazebo_process = None
         self.create_widgets()
 
     def create_widgets(self):
@@ -274,7 +279,116 @@ class RobotEnvelopeGUI:
             pady=20
         )
 
+
+                # -----------------------------
+        # Gazebo controls
         # -----------------------------
+
+        gazebo_frame = ttk.LabelFrame(
+            self.root,
+            text="Gazebo Simulation"
+        )
+
+        gazebo_frame.pack(
+            fill="x",
+            padx=20,
+            pady=10
+        )
+
+        self.launch_gazebo_button = ttk.Button(
+            gazebo_frame,
+            text="LAUNCH GAZEBO",
+            command=self.launch_gazebo
+        )
+
+        self.launch_gazebo_button.grid(
+            row=0,
+            column=0,
+            padx=10,
+            pady=10
+        )
+
+        self.stop_gazebo_button = ttk.Button(
+            gazebo_frame,
+            text="STOP GAZEBO",
+            command=self.stop_gazebo
+        )
+
+        self.stop_gazebo_button.grid(
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        self.gazebo_status = ttk.Label(
+            gazebo_frame,
+            text="Gazebo: Not running"
+        )
+
+        self.gazebo_status.grid(
+            row=0,
+            column=2,
+            padx=20,
+            pady=10
+        )
+
+        # Velocity test controls
+        velocity_frame = ttk.LabelFrame(
+            self.root,
+            text="Gazebo Velocity Test"
+        )
+        velocity_frame.pack(
+            fill="x",
+            padx=20,
+            pady=10
+        )
+
+        ttk.Label(
+            velocity_frame,
+            text="Target velocity (m/s):"
+        ).grid(
+            row=0,
+            column=0,
+            padx=10,
+            pady=10
+        )
+
+        self.velocity_entry = ttk.Entry(
+            velocity_frame,
+            width=10
+        )
+        self.velocity_entry.insert(0, "2.0")
+        self.velocity_entry.grid(
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        self.velocity_test_button = ttk.Button(
+            velocity_frame,
+            text="RUN VELOCITY TEST",
+            command=self.run_velocity_test
+        )
+        self.velocity_test_button.grid(
+            row=0,
+            column=2,
+            padx=10,
+            pady=10
+        )
+
+        self.velocity_status = ttk.Label(
+            velocity_frame,
+            text="Velocity test: Not started"
+        )
+        self.velocity_status.grid(
+            row=0,
+            column=3,
+            padx=20,
+            pady=10
+        )
+       # -----------------------------
         # Results
         # -----------------------------
 
@@ -290,49 +404,57 @@ class RobotEnvelopeGUI:
             pady=10
         )
 
-        self.results_text = tk.Text(
-            results_frame,
-            height=8,
-            width=80
+        results_container = ttk.Frame(
+            results_frame
         )
 
-        self.results_text.pack(
+        results_container.pack(
             fill="both",
             expand=True,
             padx=10,
             pady=10
         )
-                # -----------------------------
+
+        self.results_text = tk.Text(
+            results_container,
+            height=12,
+            width=80,
+            wrap="none"
+        )
+
+        self.results_text.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        results_scrollbar = ttk.Scrollbar(
+            results_container,
+            orient="vertical",
+            command=self.results_text.yview
+        )
+
+        results_scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        self.results_text.config(
+            yscrollcommand=results_scrollbar.set
+        )
+         # -----------------------------
         # Operating Envelope Graph
         # -----------------------------
 
-        graph_frame = ttk.LabelFrame(
+        self.graph_button = ttk.Button(
             self.root,
-            text="Operating Envelope Graph"
+            text="SHOW OPERATING ENVELOPE GRAPH",
+            command=self.show_graph
         )
 
-        graph_frame.pack(
-            fill="both",
-            expand=True,
+        self.graph_button.pack(
             padx=20,
             pady=10
-        )
-
-        self.figure = Figure(
-            figsize=(9, 5),
-            dpi=100
-        )
-
-        self.ax = self.figure.add_subplot(111)
-
-        self.canvas = FigureCanvasTkAgg(
-            self.figure,
-            master=graph_frame
-        )
-
-        self.canvas.get_tk_widget().pack(
-            fill="both",
-            expand=True
         )
 
     def browse_urdf(self):
@@ -365,7 +487,15 @@ class RobotEnvelopeGUI:
         speeds
     ):
 
-        self.ax.clear()
+        # Create graph window if it does not exist
+        if (
+            not hasattr(self, "graph_window")
+            or not self.graph_window.winfo_exists()
+        ):
+
+            self.show_graph()
+
+        self.graph_ax.clear()
 
         analytical_values = []
         tested_values = []
@@ -397,37 +527,477 @@ class RobotEnvelopeGUI:
             else:
                 tested_values.append(None)
 
-        self.ax.plot(
+        self.graph_ax.plot(
             speeds,
             analytical_values,
             marker="o",
             label="Analytical Limit"
         )
 
-        self.ax.plot(
+        self.graph_ax.plot(
             speeds,
             tested_values,
             marker="x",
             label="Tested Limit"
         )
 
-        self.ax.set_xlabel(
+        self.graph_ax.set_xlabel(
             "Speed (m/s)"
         )
 
-        self.ax.set_ylabel(
+        self.graph_ax.set_ylabel(
             "Maximum Safe Payload (kg)"
         )
 
-        self.ax.set_title(
+        self.graph_ax.set_title(
             "Robot Operating Envelope"
         )
 
-        self.ax.legend()
-        self.ax.grid(True)
+        self.graph_ax.legend()
+        self.graph_ax.grid(True)
 
-        self.canvas.draw()
+        self.graph_canvas.draw()
 
+    def show_graph(self):
+
+        if (
+            hasattr(self, "graph_window")
+            and self.graph_window.winfo_exists()
+        ):
+            self.graph_window.lift()
+            return
+
+        self.graph_window = tk.Toplevel(
+            self.root
+        )
+
+        self.graph_window.title(
+            "Operating Envelope Graph"
+        )
+
+        self.graph_window.geometry(
+            "1000x700"
+        )
+
+        graph_frame = ttk.Frame(
+            self.graph_window
+        )
+
+        graph_frame.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        self.graph_figure = Figure(
+            figsize=(10, 6),
+            dpi=100
+        )
+
+        self.graph_ax = self.graph_figure.add_subplot(
+            111
+        )
+
+        self.graph_canvas = FigureCanvasTkAgg(
+            self.graph_figure,
+            master=graph_frame
+        )
+
+        self.graph_canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
+
+    def run_velocity_test(self):
+
+        if self.gazebo_process is None:
+            messagebox.showerror(
+                "Velocity Test",
+                "Please launch Gazebo first."
+            )
+            return
+
+        try:
+            target_speed = float(
+                self.velocity_entry.get()
+            )
+
+        except ValueError:
+            messagebox.showerror(
+                "Velocity Test",
+                "Please enter a valid velocity."
+            )
+            return
+
+        if target_speed <= 0:
+            messagebox.showerror(
+                "Velocity Test",
+                "Velocity must be greater than 0."
+            )
+            return
+
+        self.velocity_status.config(
+            text=f"Velocity test: Running at {target_speed:.2f} m/s"
+        )
+
+        self.velocity_test_button.config(
+            state="disabled"
+        )
+
+        command = (
+            "source /opt/ros/humble/setup.bash && "
+            "cd ~/python_project/robot_envelope_analyzer && "
+            f"python3 ros2_nodes/velocity_test.py "
+            f"--ros-args -p target_speed:={target_speed}"
+        )
+
+        ros_env = os.environ.copy()
+
+        ros_env.pop("VIRTUAL_ENV", None)
+        ros_env.pop("PYTHONHOME", None)
+        ros_env.pop("PYTHONPATH", None)
+
+        ros_env["PATH"] = (
+            "/usr/bin:/bin:/opt/ros/humble/bin"
+        )
+
+        threading.Thread(
+            target=self.execute_velocity_test,
+            args=(command, ros_env),
+            daemon=True
+        ).start()
+    def execute_velocity_test(self, command, ros_env):
+
+        try:
+
+            process = subprocess.Popen(
+                ["bash", "-c", command],
+                env=ros_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+
+            output_lines = []
+
+            for line in process.stdout:
+
+                line = line.rstrip()
+
+                if line:
+                    output_lines.append(line)
+
+                    print(
+                        f"[Velocity Test] {line}"
+                    )
+
+            process.wait()
+
+            output = "\n".join(output_lines)
+
+            self.root.after(
+                0,
+                lambda: self.velocity_test_finished(
+                    output,
+                    process.returncode
+                )
+            )
+
+        except Exception as error:
+
+            self.root.after(
+                0,
+                lambda: self.velocity_test_finished(
+                    str(error),
+                    1
+                )
+            )
+    def velocity_test_finished(self, output, returncode):
+
+        self.velocity_test_button.config(
+            state="normal"
+        )
+
+        if returncode == 0:
+
+            self.velocity_status.config(
+                text="Velocity test: Completed"
+            )
+
+            self.show_velocity_result(
+            output,
+            success=True
+            )
+
+        else:
+
+            self.velocity_status.config(
+                text="Velocity test: Failed"
+            )
+
+            self.show_velocity_result(
+                output,
+                success=False
+                )
+
+    def show_velocity_result(self,output,success=True):
+
+        result_window = tk.Toplevel(
+            self.root
+        )
+
+        result_window.title(
+            "Velocity Test Result"
+            if success
+            else "Velocity Test Error"
+        )
+
+        result_window.geometry(
+            "700x500"
+        )
+
+        result_frame = ttk.Frame(
+            result_window
+        )
+
+        result_frame.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        result_text = tk.Text(
+            result_frame,
+            wrap="none"
+        )
+
+        result_text.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        scrollbar = ttk.Scrollbar(
+            result_frame,
+            orient="vertical",
+            command=result_text.yview
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y"
+        )
+
+        result_text.config(
+            yscrollcommand=scrollbar.set
+        )
+
+        result_text.insert(
+            tk.END,
+            output
+        )
+
+        result_text.config(
+            state="disabled"
+        )
+
+        close_button = ttk.Button(
+            result_window,
+            text="CLOSE",
+            command=result_window.destroy
+        )
+
+        close_button.pack(
+            pady=(0, 10)
+        )
+
+    def launch_gazebo(self):
+
+        if self.gazebo_process is not None:
+            messagebox.showinfo(
+                "Gazebo",
+                "Gazebo is already running."
+            )
+            return
+
+        urdf_path = self.urdf_entry.get().strip()
+
+        if not urdf_path:
+            messagebox.showerror(
+                "Gazebo Error",
+                "Please select a URDF file first."
+            )
+            return
+
+        urdf_file = os.path.basename(urdf_path)
+
+        try:
+
+            command = (
+                "source /opt/ros/humble/setup.bash && "
+                "cd ~/python_project/robot_envelope_analyzer && "
+                f"ros2 launch launch/gazebo_robot.launch.py "
+                f"urdf_file:={urdf_file}"
+            )
+            ros_env = os.environ.copy()
+
+            ros_env.pop("VIRTUAL_ENV", None)
+            ros_env.pop("PYTHONHOME", None)
+            ros_env.pop("PYTHONPATH", None)
+
+            ros_env["PATH"] = (
+                "/usr/bin:/bin:/opt/ros/humble/bin"
+            )
+
+            self.gazebo_process = subprocess.Popen(
+                ["bash", "-c", command],
+                env=ros_env,
+                start_new_session=True
+            )
+
+            self.gazebo_status.config(
+                text="Gazebo: Starting..."
+            )
+
+            self.launch_gazebo_button.config(
+                state="disabled"
+            )
+
+            threading.Thread(
+                target=self.activate_controller,
+                daemon=True
+            ).start()
+
+        except Exception as error:
+
+            self.gazebo_process = None
+
+            messagebox.showerror(
+                "Gazebo Error",
+                str(error)
+            )
+
+
+    def activate_controller(self):
+
+        import time
+
+        time.sleep(8)
+
+        try:
+
+            command = (
+                "source /opt/ros/humble/setup.bash && "
+                "ros2 control load_controller "
+                "diff_drive_controller && "
+                "ros2 control set_controller_state "
+                "diff_drive_controller inactive && "
+                "ros2 control set_controller_state "
+                "diff_drive_controller active"
+            )
+
+            result = subprocess.run(
+                ["bash", "-c", command],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+
+                self.root.after(
+                    0,
+                    lambda: self.gazebo_status.config(
+                        text="Gazebo: READY - Controller Active"
+                    )
+                )
+
+            else:
+
+                self.root.after(
+                    0,
+                    lambda: self.gazebo_status.config(
+                        text="Gazebo: Running - Controller Error"
+                    )
+                )
+
+        except Exception as error:
+
+            self.root.after(
+                0,
+                lambda: self.gazebo_status.config(
+                    text="Gazebo: Controller Error"
+                )
+            )
+
+
+    def stop_gazebo(self):
+
+        if self.gazebo_process is None:
+            return
+
+        try:
+
+            process_group = os.getpgid(
+                self.gazebo_process.pid
+            )
+
+            # Ask the entire process group to shut down
+            os.killpg(
+                process_group,
+                signal.SIGTERM
+            )
+
+            # Give Gazebo time to shut down
+            import time
+            time.sleep(2)
+
+            # Check whether anything from the process group remains
+            try:
+
+                os.killpg(
+                    process_group,
+                    0
+                )
+
+                # Something is still alive → force termination
+                os.killpg(
+                    process_group,
+                    signal.SIGKILL
+                )
+
+            except ProcessLookupError:
+                pass
+
+            self.gazebo_process = None
+
+            self.gazebo_status.config(
+                text="Gazebo: Not running"
+            )
+
+            self.launch_gazebo_button.config(
+                state="normal"
+            )
+
+        except ProcessLookupError:
+
+            self.gazebo_process = None
+
+            self.gazebo_status.config(
+                text="Gazebo: Not running"
+            )
+
+            self.launch_gazebo_button.config(
+                state="normal"
+            )
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Gazebo Error",
+                str(error)
+            )
     def run_analysis(self):
 
         try:
