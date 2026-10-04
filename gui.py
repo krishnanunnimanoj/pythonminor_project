@@ -54,9 +54,46 @@ class RobotEnvelopeGUI:
 
         ttk.Label(
             robot_frame,
-            text="URDF File:"
+            text="Payload Condition:"
         ).grid(
             row=0,
+            column=0,
+            padx=10,
+            pady=10
+        )
+
+        self.payload_selection = ttk.Combobox(
+            robot_frame,
+            values=[
+                "Base Robot (0 kg)",
+                "2 kg Payload",
+                "5 kg Payload",
+                "5.44 kg Payload",
+                "6 kg Payload"
+            ],
+            state="readonly",
+            width=30
+        )
+
+        self.payload_selection.current(0)
+
+        self.payload_selection.grid(
+            row=0,
+            column=1,
+            padx=10,
+            pady=10
+        )
+
+        self.payload_selection.bind(
+            "<<ComboboxSelected>>",
+            self.select_payload_urdf
+        )
+
+        ttk.Label(
+            robot_frame,
+            text="URDF File:"
+        ).grid(
+            row=1,
             column=0,
             padx=10,
             pady=10
@@ -68,7 +105,7 @@ class RobotEnvelopeGUI:
         )
 
         self.urdf_entry.grid(
-            row=0,
+            row=1,
             column=1,
             padx=10,
             pady=10
@@ -81,7 +118,7 @@ class RobotEnvelopeGUI:
         )
 
         self.browse_button.grid(
-            row=0,
+            row=1,
             column=2,
             padx=10,
             pady=10
@@ -456,6 +493,44 @@ class RobotEnvelopeGUI:
             padx=20,
             pady=10
         )
+
+
+    def select_payload_urdf(self,event=None):
+
+        payload_files = {
+            "Base Robot (0 kg)": "my_robot.urdf",
+            "2 kg Payload": "my_robot_2kg_payload.urdf",
+            "5 kg Payload": "my_robot_5kg_payload.urdf",
+            "5.44 kg Payload": "my_robot_5_44kg_payload.urdf",
+            "6 kg Payload": "my_robot_6kg_payload.urdf"
+        }
+
+        selected_payload = self.payload_selection.get()
+
+        urdf_file = payload_files[selected_payload]
+
+        urdf_path = os.path.join(
+            os.path.expanduser(
+                "~/python_project/robot_envelope_analyzer"
+            ),
+            "robots",
+            urdf_file
+        )
+
+        self.urdf_entry.delete(
+            0,
+            tk.END
+        )
+
+        self.urdf_entry.insert(
+            0,
+            urdf_path
+        )
+        self.robot_info.config(
+            text=f"Selected: {selected_payload}"
+        )
+
+
 
     def browse_urdf(self):
 
