@@ -1,4 +1,4 @@
-# Robot Operating Envelope Analyzer
+# RoboLimit
 
 A Python-based robotics engineering tool for analyzing the safe operating envelope of a mobile robot under different payload, speed, and environmental conditions.
 
